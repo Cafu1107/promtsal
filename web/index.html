@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://generativelanguage.googleapis.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'; require-trusted-types-for 'script'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Dağınık promtları temizleyen, hedefe göre güçlendiren ve belirsiz noktaları tahmin etmek yerine soran promt düzenleyici.">
+<title>Promtsal</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="wordmark">Promt<span class="added">sal<svg class="caret" viewBox="0 0 16 10" aria-hidden="true"><path d="M2 9 8 2l6 7"/></svg></span></h1>
+    <p class="tag" data-i18n="tagline"></p>
+    <nav class="nav">
+      <button id="tplBtn" class="btn ghost small" type="button" data-i18n="nav.templates"></button>
+      <button id="histBtn" class="btn ghost small" type="button" aria-expanded="false" aria-controls="hist"><span data-i18n="nav.history"></span> · <span id="histCount">0</span></button>
+      <button id="setBtn" class="btn ghost small" type="button" data-i18n="nav.settings"></button>
+      <div class="seg seg-sm" role="radiogroup" data-key="ui" data-i18n-aria="nav.uiLang">
+        <button type="button" role="radio" data-v="tr">TR</button>
+        <button type="button" role="radio" data-v="en">EN</button>
+      </div>
+    </nav>
+  </header>
+
+  <p id="notice" class="notice" hidden></p>
+
+  <main class="desk">
+    <section class="sheet" aria-labelledby="srcLabel">
+      <div class="sheet-head">
+        <label id="srcLabel" class="label" for="src" data-i18n="src.label"></label>
+        <span id="srcCount" class="count"></span>
+      </div>
+      <div class="editor">
+        <div id="lint" class="lint" aria-hidden="true"></div>
+        <textarea id="src" spellcheck="false" data-i18n-ph="src.placeholder"></textarea>
+      </div>
+      <div id="srcNote" class="src-note" hidden>
+        <span id="srcNoteText"></span>
+        <button id="undoBtn" class="linkbtn" type="button" data-i18n="src.undo"></button>
+      </div>
+
+      <div id="health" class="health">
+        <div class="health-head">
+          <span class="label" data-i18n="health.title"></span>
+          <span id="healthScore" class="health-score"></span>
+          <span class="meter" aria-hidden="true"><span id="healthBar" class="meter-fill"></span></span>
+        </div>
+        <ul id="healthList" class="health-list"></ul>
+        <p class="health-note" data-i18n="health.local"></p>
+      </div>
+
+      <div class="controls">
+        <div class="ctl">
+          <span class="label" id="modeL" data-i18n="ctl.mode"></span>
+          <div class="seg" role="radiogroup" aria-labelledby="modeL" data-key="mode">
+            <button type="button" role="radio" data-v="clean" data-i18n="mode.clean"></button>
+            <button type="button" role="radio" data-v="boost" data-i18n="mode.boost"></button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="label" id="targetL" data-i18n="ctl.target"></span>
+          <div class="seg" role="radiogroup" aria-labelledby="targetL" data-key="target">
+            <button type="button" role="radio" data-v="general" data-i18n="target.general"></button>
+            <button type="button" role="radio" data-v="chat" data-i18n="target.chat"></button>
+            <button type="button" role="radio" data-v="agent" data-i18n="target.agent"></button>
+            <button type="button" role="radio" data-v="image" data-i18n="target.image"></button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="label" id="langL" data-i18n="ctl.lang"></span>
+          <div class="seg" role="radiogroup" aria-labelledby="langL" data-key="lang">
+            <button type="button" role="radio" data-v="same" data-i18n="lang.same"></button>
+            <button type="button" role="radio" data-v="tr" data-i18n="lang.tr"></button>
+            <button type="button" role="radio" data-v="en" data-i18n="lang.en"></button>
+          </div>
+        </div>
+      </div>
+      <p id="modeHint" class="mode-hint"></p>
+      <div class="run">
+        <button id="runBtn" class="btn primary" type="button"></button>
+        <button id="stopBtn" class="btn ghost" type="button" hidden data-i18n="stop"></button>
+        <button id="provBtn" class="prov" type="button"></button>
+      </div>
+      <p id="estimate" class="estimate"></p>
+    </section>
+
+    <section id="proof" class="sheet" aria-labelledby="outLabel">
+      <div class="sheet-head">
+        <span id="outLabel" class="label" data-i18n="out.label"></span>
+        <span id="sampleBadge" class="badge" hidden data-i18n="out.example"></span>
+        <div class="tabs" role="tablist" data-i18n-aria="tab.aria">
+          <button type="button" role="tab" data-view="prompt" aria-selected="true" data-i18n="tab.prompt"></button>
+          <button type="button" role="tab" data-view="diff" aria-selected="false" data-i18n="tab.diff"></button>
+        </div>
+      </div>
+      <div id="status" class="status" aria-live="polite"></div>
+      <div id="out" class="out empty" tabindex="0" data-i18n-aria="out.aria"></div>
+      <div id="legend" class="legend" hidden>
+        <span><del data-i18n="legend.del"></del></span>
+        <span><ins data-i18n="legend.ins"></ins></span>
+        <span><span class="pil">¶</span> <span data-i18n="legend.nl"></span></span>
+      </div>
+      <div class="out-foot">
+        <span id="stats" class="count"></span>
+        <div class="acts">
+          <button id="regenBtn" class="btn ghost small" type="button" hidden data-i18n="out.regen"></button>
+          <button id="copyBtn" class="btn primary small" type="button" disabled data-i18n="out.copy"></button>
+        </div>
+      </div>
+      <p id="usage" class="usage" hidden></p>
+      <div id="notes" class="notes" hidden>
+        <div id="changesBox">
+          <h2 data-i18n="changes.title"></h2>
+          <ul id="changes"></ul>
+        </div>
+        <div id="qBox" class="qbox">
+          <h2><span data-i18n="q.title"></span> <span id="qCount" class="qcount"></span></h2>
+          <p class="sub" data-i18n="q.sub"></p>
+          <div id="questions" class="q-list"></div>
+          <button id="applyBtn" class="btn primary small" type="button" disabled data-i18n="q.apply"></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section id="hist" class="hist" hidden aria-labelledby="histTitle">
+    <div class="hist-head">
+      <h2 id="histTitle" data-i18n="hist.title"></h2>
+      <span class="note" data-i18n="hist.note"></span>
+      <button id="histClear" class="btn ghost small" type="button" data-i18n="hist.clear"></button>
+    </div>
+    <p id="histEmpty" class="hist-empty" data-i18n="hist.empty"></p>
+    <ul id="histList" class="hist-list"></ul>
+  </section>
+
+  <footer class="foot">
+    <span id="footText"></span>
+    <a href="https://github.com/Cafu1107/promtsal" target="_blank" rel="noopener noreferrer" data-i18n="foot.source"></a>
+  </footer>
+</div>
+
+<dialog id="setDlg" class="dlg" aria-labelledby="setTitle">
+  <div class="dlg-head">
+    <h2 id="setTitle" data-i18n="set.title"></h2>
+    <button class="btn ghost small" type="button" data-close data-i18n="dlg.close"></button>
+  </div>
+  <div class="dlg-body">
+    <section class="set-sec" data-build="web">
+      <h3 data-i18n="key.title"></h3>
+      <p class="muted" data-i18n="key.why"></p>
+      <a class="extlink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" data-i18n="key.get"></a>
+      <label for="keyInput" class="flabel" data-i18n="key.label"></label>
+      <div class="inrow">
+        <input id="keyInput" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="AIza…">
+        <button id="keyShow" class="btn ghost small" type="button" data-i18n="key.show"></button>
+      </div>
+      <label class="check"><input id="keyRemember" type="checkbox"> <span data-i18n="key.remember"></span></label>
+      <p class="muted small" data-i18n="key.rememberHint"></p>
+      <div class="row">
+        <button id="keySave" class="btn primary small" type="button" data-i18n="key.save"></button>
+        <button id="keyClear" class="btn ghost small" type="button" data-i18n="key.clear"></button>
+      </div>
+      <p id="keyStatus" class="fstatus" aria-live="polite"></p>
+      <p class="warnbox" data-i18n="key.privacy"></p>
+      <p class="muted small" data-i18n="key.restrict"></p>
+    </section>
+    <section class="set-sec" data-build="web">
+      <h3 data-i18n="models.title"></h3>
+      <div class="grid2">
+        <label class="field"><span data-i18n="models.clean"></span><select id="modelClean"></select></label>
+        <label class="field"><span data-i18n="models.boost"></span><select id="modelBoost"></select></label>
+      </div>
+      <p id="modelsHint" class="muted small"></p>
+    </section>
+    <section class="set-sec" data-build="artifact">
+      <h3 data-i18n="claude.title"></h3>
+      <p class="muted" data-i18n="claude.body"></p>
+    </section>
+    <section class="set-sec">
+      <h3 data-i18n="rules.title"></h3>
+      <p class="muted" data-i18n="rules.body"></p>
+      <textarea id="rulesInput" rows="4" maxlength="2000" data-i18n-ph="rules.placeholder"></textarea>
+      <label class="check"><input id="rulesApply" type="checkbox"> <span data-i18n="rules.apply"></span></label>
+    </section>
+    <section class="set-sec">
+      <h3 data-i18n="data.title"></h3>
+      <p class="muted" data-i18n="data.body"></p>
+      <div class="row"><button id="wipeBtn" class="btn ghost small danger" type="button" data-i18n="data.wipe"></button></div>
+      <p id="wipeStatus" class="fstatus" aria-live="polite"></p>
+    </section>
+  </div>
+</dialog>
+
+<dialog id="tplDlg" class="dlg" aria-labelledby="tplTitle">
+  <div class="dlg-head">
+    <h2 id="tplTitle" data-i18n="tpl.title"></h2>
+    <button class="btn ghost small" type="button" data-close data-i18n="dlg.close"></button>
+  </div>
+  <div class="dlg-body">
+    <section class="set-sec">
+      <h3 data-i18n="tpl.builtin"></h3>
+      <ul id="tplBuiltin" class="tpl-list"></ul>
+    </section>
+    <section class="set-sec">
+      <h3 data-i18n="tpl.mine"></h3>
+      <p id="tplMineEmpty" class="muted" data-i18n="tpl.mineEmpty"></p>
+      <ul id="tplMine" class="tpl-list"></ul>
+    </section>
+    <section class="set-sec">
+      <label for="tplName" class="flabel" data-i18n="tpl.saveTitle"></label>
+      <div class="inrow">
+        <input id="tplName" type="text" maxlength="60" autocomplete="off" data-i18n-ph="tpl.namePh">
+        <button id="tplSave" class="btn primary small" type="button" data-i18n="tpl.save"></button>
+      </div>
+      <p id="tplStatus" class="fstatus" aria-live="polite"></p>
+    </section>
+  </div>
+</dialog>
+
+<script src="js/i18n.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/providers.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

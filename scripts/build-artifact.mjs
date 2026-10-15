@@ -16,7 +16,12 @@ let body = html.match(/<body\b[^>]*>([\s\S]*)<\/body\s*>/i)[1];
 // External script tags in any case/quoting; whatever is left afterwards must contain no script at all.
 const SCRIPT_TAG = /<script\b[^>]*?\bsrc\s*=\s*["']?([^"'\s>]+)["']?[^>]*>\s*<\/script\b[^>]*>/gi;
 const scripts = [...body.matchAll(SCRIPT_TAG)].map((m) => m[1]);
-body = body.replace(SCRIPT_TAG, "").trim();
+// Strip until nothing changes, then fail closed if any script tag survived.
+for (let prev = ""; prev !== body; ) {
+  prev = body;
+  body = body.replace(SCRIPT_TAG, "");
+}
+body = body.trim();
 if (/<\/?script\b/i.test(body)) throw new Error("index.html has a script tag the build can't inline.");
 for (const src of scripts) if (!/^[\w./-]+\.js$/.test(src) || src.includes("..")) throw new Error("Unexpected script path: " + src);
 

@@ -12,9 +12,13 @@ const web = (p) => join(root, "web", p);
 const html = readFileSync(web("index.html"), "utf8");
 
 const title = html.match(/<title>[\s\S]*?<\/title>/)[0];
-let body = html.match(/<body>([\s\S]*)<\/body>/)[1];
-const scripts = [...body.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
-body = body.replace(/<script src="[^"]+"><\/script>\s*/g, "").trim();
+let body = html.match(/<body\b[^>]*>([\s\S]*)<\/body\s*>/i)[1];
+// External script tags in any case/quoting; whatever is left afterwards must contain no script at all.
+const SCRIPT_TAG = /<script\b[^>]*?\bsrc\s*=\s*["']?([^"'\s>]+)["']?[^>]*>\s*<\/script\b[^>]*>/gi;
+const scripts = [...body.matchAll(SCRIPT_TAG)].map((m) => m[1]);
+body = body.replace(SCRIPT_TAG, "").trim();
+if (/<\/?script\b/i.test(body)) throw new Error("index.html has a script tag the build can't inline.");
+for (const src of scripts) if (!/^[\w./-]+\.js$/.test(src) || src.includes("..")) throw new Error("Unexpected script path: " + src);
 
 const fonts = readFileSync(web("fonts/fonts.css"), "utf8").replace(/url\(([\w.-]+\.woff2)\)/g, (m, file) =>
   `url(data:font/woff2;base64,${readFileSync(web("fonts/" + file)).toString("base64")})`);

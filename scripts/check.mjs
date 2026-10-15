@@ -1,6 +1,6 @@
 // Promtsal checks: syntax, i18n parity, engine behaviour, page security settings, and a secret scan.
 // Usage: node scripts/check.mjs   (CI runs it before every deploy)
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -133,8 +133,13 @@ check("CSP: Trusted Types enforced and no policy may be created", () => {
   assert.match(csp, /trusted-types 'none'/);
 });
 check("index.html loads no third-party files and has no inline script", () => {
-  assert.ok(!/<script>/.test(html), "inline script");
-  assert.ok(!/<(?:script|link)[^>]+(?:src|href)="(?:https?:)?\/\//.test(html), "external script or stylesheet");
+  // Look at every <script>/<link> opening tag, any case or quoting, rather than one exact spelling.
+  const tags = [...html.matchAll(/<(script|link)\b[^>]*>/gi)].map((m) => m[0]);
+  assert.ok(tags.some((tag) => /^<script/i.test(tag)), "scripts found");
+  for (const tag of tags) {
+    if (/^<script/i.test(tag)) assert.match(tag, /\bsrc\s*=/i, "inline script: " + tag);
+    assert.ok(!/\b(?:src|href)\s*=\s*["']?\s*(?:[a-z][\w+.-]*:|\/\/)/i.test(tag), "only relative URLs: " + tag);
+  }
   assert.match(html, /<meta name="referrer" content="no-referrer">/);
   for (const m of html.matchAll(/target="_blank"[^>]*>/g)) assert.match(m[0], /rel="noopener noreferrer"/);
 });
@@ -203,12 +208,15 @@ check("no API keys or tokens in the repository", () => {
   const binary = /\.(png|jpe?g|gif|webp|ico|woff2?)$/i;
   const hits = [];
   (function walk(dir) {
-    for (const name of readdirSync(dir)) {
-      if (skip.has(name)) continue;
-      const p = join(dir, name);
-      if (statSync(p).isDirectory()) { walk(p); continue; }
-      if (binary.test(name) || statSync(p).size > 2e6) continue;
-      const text = readFileSync(p, "utf8");
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      if (skip.has(ent.name)) continue;
+      const p = join(dir, ent.name);
+      if (ent.isDirectory()) { walk(p); continue; }
+      if (!ent.isFile() || binary.test(ent.name)) continue;
+      // Read once and size-check the buffer (no stat-then-read race).
+      const buf = readFileSync(p);
+      if (buf.length > 2e6) continue;
+      const text = buf.toString("utf8");
       for (const re of patterns) if (re.test(text)) hits.push(relative(root, p) + " ~ " + re);
     }
   })(root);

@@ -5,7 +5,12 @@
   "use strict";
   const PS = (root.PS = root.PS || {});
   const GEMINI = "https://generativelanguage.googleapis.com/v1beta";
-  const FETCH_OPTS = { credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store" };
+  // strict-origin sends only "https://cafu1107.github.io/" (never the path) as Referer. Google needs it to
+  // honour a key's "Websites" restriction; with no Referer at all such a key is rejected.
+  const FETCH_OPTS = { credentials: "omit", referrerPolicy: "strict-origin", cache: "no-store" };
+  // Caps the answer (thinking included on some models) so a runaway reply can't run up a paid bill.
+  const MAX_OUTPUT_TOKENS = 16384;
+  const MODEL_ID = /^[\w.-]{1,80}$/;
 
   const fail = (code, message, text) => ({ code, message: message || "", text });
 
@@ -37,12 +42,14 @@
     return (data.models || [])
       .filter((m) => m && typeof m.name === "string" && Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
       .map((m) => ({ id: m.name.replace(/^models\//, ""), label: m.displayName || m.name }))
-      .filter((m) => /^gemini/i.test(m.id) && !SKIP.test(m.id));
+      .filter((m) => MODEL_ID.test(m.id) && /^gemini/i.test(m.id) && !SKIP.test(m.id))
+      .map((m) => ({ id: m.id, label: String(m.label).slice(0, 80) }));
   }
 
   const BLOCKED = /^(SAFETY|PROHIBITED_CONTENT|BLOCKLIST|SPII|RECITATION)$/;
 
   async function geminiRun({ key, model, system, user, signal, onText }) {
+    if (!MODEL_ID.test(model)) throw fail("model_not_found", "invalid model id");
     let res;
     try {
       res = await fetch(GEMINI + "/models/" + encodeURIComponent(model) + ":streamGenerateContent?alt=sse", {
@@ -53,6 +60,7 @@
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: user }] }],
+          generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
         }),
       });
     } catch (e) { throw netError(e); }
@@ -141,5 +149,9 @@
     }
   }
 
-  PS.providers = { geminiModels, geminiRun, claudeSample, claudeRun };
+  // Gemini keys are printable ASCII without spaces ("AIza…" today). Anything else is rejected before it
+  // is stored or sent, so a pasted line break or stray text never ends up in storage.
+  const validKey = (k) => typeof k === "string" && /^[\x21-\x7e]{20,256}$/.test(k);
+
+  PS.providers = { geminiModels, geminiRun, claudeSample, claudeRun, validKey, MAX_OUTPUT_TOKENS };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -42,10 +42,11 @@ English · [Türkçe](README.tr.md)
 
 ## Privacy and security
 
-- **No server, no tracking.** Promtsal is a static page on GitHub Pages. Prompts and the key go only to `generativelanguage.googleapis.com`.
-- **The key is yours.** It lives in `sessionStorage` and disappears when you close the tab. It moves to `localStorage` only if you tick **Remember on this device**. One click deletes it.
-- **Locked-down page.** A strict Content Security Policy allows no other network destination, no inline or third-party scripts, and no `eval`. Trusted Types are enforced and nothing is rendered as HTML.
-- **Checked on every push.** CI runs the tests, verifies those rules, and scans the repository for leaked keys before deploying.
+- **No server, no tracking, no third parties.** Promtsal is a static page on GitHub Pages with self-hosted fonts. Prompts and the key go only to `generativelanguage.googleapis.com`.
+- **The key is yours.** It lives in `sessionStorage` and disappears when you close the tab. It moves to `localStorage` only if you tick **Remember on this device**. One click deletes it. Keys restricted to this website work, because Google gets the site's origin (never the path).
+- **Locked-down page.** A strict Content Security Policy allows no other network destination, no inline scripts and no `eval`. Trusted Types are enforced and nothing is rendered as HTML. The page refuses to run inside another site's frame.
+- **History is optional.** Turn off **Keep history and the draft** in Settings and nothing you type is stored.
+- **Checked on every push.** CI runs 30 tests and security checks and scans for leaked keys before deploying. Actions are pinned to commit SHAs; CodeQL and secret scanning watch the repository.
 
 Details and how to report a problem: [SECURITY.md](SECURITY.md).
 
@@ -95,4 +96,4 @@ Bug reports and ideas are welcome in [Issues](https://github.com/Cafu1107/promts
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Fonts (Bricolage Grotesque, Instrument Sans, IBM Plex Mono) are self-hosted under the [SIL Open Font License 1.1](web/fonts/).

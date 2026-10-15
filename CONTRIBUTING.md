@@ -22,7 +22,8 @@ node scripts/build-artifact.mjs # the claude.ai single-file build still works
 
 - **Never render HTML from strings.** Use `textContent` and DOM nodes. `innerHTML`, `eval` and inline scripts are blocked by the CSP and by the checks.
 - **Every interface string goes in `web/js/i18n.js`** in both `tr` and `en`.
-- **Don't add network destinations** without a good reason; each one needs a CSP change and a note in `SECURITY.md`.
+- **Don't add network destinations or third-party files** (CDNs, analytics, hosted fonts). Each one needs a CSP change, a note in `SECURITY.md`, and an update to the CSP check.
+- **Pin new GitHub Actions to a full commit SHA** with the version in a comment; the checks fail otherwise.
 - **The model must not invent facts.** Changes to the instructions in `web/js/engine.js` should keep the "ask instead of guessing" rule.
 
 ## Project layout
@@ -31,6 +32,7 @@ node scripts/build-artifact.mjs # the claude.ai single-file build still works
 | --- | --- |
 | `web/index.html` | Page markup and CSP |
 | `web/app.css` | Styles (light and dark) |
+| `web/fonts/` | Self-hosted fonts and their OFL licenses |
 | `web/js/i18n.js` | Turkish and English strings |
 | `web/js/engine.js` | Model instructions, reply parsing, diff, health check, prices, templates |
 | `web/js/providers.js` | Gemini (browser to Google) and Claude (claude.ai artifact) calls |

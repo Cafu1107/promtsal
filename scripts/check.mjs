@@ -113,35 +113,101 @@ check("cost uses dated prices and returns null for unknown models", () => {
 });
 
 console.log("\npage security");
-check("index.html has a strict CSP", () => {
-  const html = read("web/index.html");
-  const csp = (html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || "";
+const html = read("web/index.html");
+const csp = (html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || "";
+check("CSP: nothing but our own files and the Gemini API", () => {
   assert.match(csp, /default-src 'none'/);
   assert.match(csp, /script-src 'self'(;|$)/);
+  assert.match(csp, /style-src 'self'(;|$)/);
+  assert.match(csp, /font-src 'self'(;|$)/);
   assert.match(csp, /connect-src https:\/\/generativelanguage\.googleapis\.com(;|$)/);
+  assert.match(csp, /base-uri 'none'/);
+  assert.match(csp, /form-action 'none'/);
+  assert.match(csp, /object-src 'none'/);
+  assert.ok(!/unsafe-|data: *;|\*/.test(csp.replace("img-src 'self' data:", "")), "no unsafe-*, wildcards or data: outside img-src");
+  const origins = csp.match(/https?:\/\/[^\s;]+/g) || [];
+  assert.deepEqual(origins, ["https://generativelanguage.googleapis.com"]);
+});
+check("CSP: Trusted Types enforced and no policy may be created", () => {
   assert.match(csp, /require-trusted-types-for 'script'/);
-  assert.ok(!/unsafe-inline|unsafe-eval/.test(csp), "no unsafe-* sources");
-  assert.ok(!/<script>/.test(html), "no inline scripts");
+  assert.match(csp, /trusted-types 'none'/);
+});
+check("index.html loads no third-party files and has no inline script", () => {
+  assert.ok(!/<script>/.test(html), "inline script");
+  assert.ok(!/<(?:script|link)[^>]+(?:src|href)="(?:https?:)?\/\//.test(html), "external script or stylesheet");
   assert.match(html, /<meta name="referrer" content="no-referrer">/);
+  for (const m of html.matchAll(/target="_blank"[^>]*>/g)) assert.match(m[0], /rel="noopener noreferrer"/);
+});
+check("self-hosted fonts exist, are WOFF2 and ship with their licenses", () => {
+  const css = read("web/fonts/fonts.css");
+  const files = [...new Set([...css.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1]))];
+  assert.ok(files.length >= 4, "font files referenced");
+  for (const f of files) {
+    assert.match(f, /^[\w.-]+\.woff2$/, "local file name: " + f);
+    assert.equal(readFileSync(join(root, "web/fonts", f)).subarray(0, 4).toString("latin1"), "wOF2", f);
+  }
+  for (const lic of ["OFL-BricolageGrotesque.txt", "OFL-InstrumentSans.txt", "OFL-IBMPlexMono.txt"]) {
+    assert.match(read("web/fonts/" + lic), /SIL OPEN FONT LICENSE/, lic);
+  }
 });
 check("no innerHTML / eval in browser code", () => {
   for (const f of ["web/js/app.js", "web/js/engine.js", "web/js/providers.js", "web/js/i18n.js"]) {
     const src = read(f);
-    assert.ok(!/\.innerHTML|\.outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function\(/.test(src), f);
+    assert.ok(!/\.innerHTML|\.outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function\(|setTimeout\(\s*["'`]/.test(src), f);
   }
+});
+check("web build refuses to run inside another site's frame", () => {
+  const src = read("web/js/app.js");
+  assert.match(src, /if \(BUILD === "web"\) \{[\s\S]{0,200}window\.top !== window\.self/);
+});
+
+console.log("\nkey handling");
+check("Gemini calls send the key in a header, origin-only Referer, no cookies, capped output", () => {
+  const src = read("web/js/providers.js");
+  assert.match(src, /"x-goog-api-key": key/);
+  assert.ok(!/[?&]key=/.test(src), "key must never go in the URL");
+  assert.match(src, /referrerPolicy: "strict-origin"/);
+  assert.match(src, /credentials: "omit"/);
+  assert.match(src, /maxOutputTokens: MAX_OUTPUT_TOKENS/);
+});
+check("validKey accepts key-shaped strings and rejects the rest", () => {
+  const ok = sandbox.PS.providers.validKey;
+  assert.equal(ok("test_" + "x".repeat(30)), true);
+  for (const bad of ["", "short", "has space " + "x".repeat(30), "line\nbreak" + "x".repeat(30), "ş".repeat(30), "x".repeat(300), null]) {
+    assert.equal(ok(bad), false, JSON.stringify(bad));
+  }
+});
+check("the key lives in sessionStorage unless the visitor asks to remember it", () => {
+  const src = read("web/js/app.js");
+  assert.match(src, /if \(remember\) \{ localStorage\.setItem\(KEY \+ "key", v\); sessionStorage\.removeItem\(KEY \+ "key"\); \}/);
+  assert.match(src, /else \{ sessionStorage\.setItem\(KEY \+ "key", v\); localStorage\.removeItem\(KEY \+ "key"\); \}/);
+  assert.match(src, /if \(!P\.validKey\(v\)\)/);
+});
+
+console.log("\nCI");
+check("workflow: least privilege, SHA-pinned actions, no persisted token", () => {
+  const wf = read(".github/workflows/pages.yml");
+  assert.match(wf, /^permissions:\n  contents: read\n\n/m);
+  const uses = [...wf.matchAll(/uses: ([^\s#]+)/g)].map((m) => m[1]);
+  assert.ok(uses.length >= 5);
+  for (const u of uses) assert.match(u, /@[0-9a-f]{40}$/, "pin to a full SHA: " + u);
+  const checkouts = (wf.match(/actions\/checkout@/g) || []).length;
+  assert.equal((wf.match(/persist-credentials: false/g) || []).length, checkouts);
 });
 
 console.log("\nsecrets");
 check("no API keys or tokens in the repository", () => {
-  const patterns = [/AIza[0-9A-Za-z_-]{35}/, /sk-ant-[0-9A-Za-z_-]{20,}/, /sk-[A-Za-z0-9]{32,}/, /gh[pousr]_[A-Za-z0-9]{30,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/];
+  const patterns = [/AIza[0-9A-Za-z_-]{35}/, /ya29\.[0-9A-Za-z_-]{20,}/, /sk-ant-[0-9A-Za-z_-]{20,}/, /sk-[A-Za-z0-9]{32,}/,
+    /gh[pousr]_[A-Za-z0-9]{30,}/, /github_pat_[A-Za-z0-9_]{40,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/];
   const skip = new Set([".git", "node_modules", "dist"]);
+  const binary = /\.(png|jpe?g|gif|webp|ico|woff2?)$/i;
   const hits = [];
   (function walk(dir) {
     for (const name of readdirSync(dir)) {
       if (skip.has(name)) continue;
       const p = join(dir, name);
       if (statSync(p).isDirectory()) { walk(p); continue; }
-      if (statSync(p).size > 2e6) continue;
+      if (binary.test(name) || statSync(p).size > 2e6) continue;
       const text = readFileSync(p, "utf8");
       for (const re of patterns) if (re.test(text)) hits.push(relative(root, p) + " ~ " + re);
     }

@@ -3,15 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://generativelanguage.googleapis.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'; require-trusted-types-for 'script'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src https://generativelanguage.googleapis.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types 'none'; upgrade-insecure-requests">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Dağınık promtları temizleyen, hedefe göre güçlendiren ve belirsiz noktaları tahmin etmek yerine soran promt düzenleyici.">
 <title>Promtsal</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -193,6 +191,8 @@
     <section class="set-sec">
       <h3 data-i18n="data.title"></h3>
       <p class="muted" data-i18n="data.body"></p>
+      <label class="check"><input id="keepHistory" type="checkbox"> <span data-i18n="data.keep"></span></label>
+      <p class="muted small" data-i18n="data.keepHint"></p>
       <div class="row"><button id="wipeBtn" class="btn ghost small danger" type="button" data-i18n="data.wipe"></button></div>
       <p id="wipeStatus" class="fstatus" aria-live="polite"></p>
     </section>

@@ -42,10 +42,11 @@
 
 ## Gizlilik ve güvenlik
 
-- **Sunucu yok, takip yok.** Promtsal GitHub Pages'te duran statik bir sayfa. Promtlar ve anahtar yalnızca `generativelanguage.googleapis.com` adresine gider.
-- **Anahtar senin.** `sessionStorage`'da durur ve sekmeyi kapatınca silinir. Yalnızca **Bu cihazda hatırla**'yı işaretlersen `localStorage`'a geçer. Tek tıkla silinir.
-- **Kilitli sayfa.** Sıkı bir Content Security Policy başka hiçbir adrese bağlantıya, satır içi ya da üçüncü taraf scriptlere ve `eval`'e izin vermez. Trusted Types zorunludur, hiçbir şey HTML olarak basılmaz.
-- **Her push'ta kontrol.** CI yayından önce testleri çalıştırır, bu kuralları doğrular ve repoda sızmış anahtar arar.
+- **Sunucu yok, takip yok, üçüncü taraf yok.** Promtsal fontları kendi içinde barındıran, GitHub Pages'te duran statik bir sayfa. Promtlar ve anahtar yalnızca `generativelanguage.googleapis.com` adresine gider.
+- **Anahtar senin.** `sessionStorage`'da durur ve sekmeyi kapatınca silinir. Yalnızca **Bu cihazda hatırla**'yı işaretlersen `localStorage`'a geçer. Tek tıkla silinir. Bu siteye kısıtlanmış anahtarlar çalışır, çünkü Google'a sitenin kökeni gider (sayfa yolu asla gitmez).
+- **Kilitli sayfa.** Sıkı bir Content Security Policy başka hiçbir adrese bağlantıya, satır içi scriptlere ve `eval`'e izin vermez. Trusted Types zorunludur, hiçbir şey HTML olarak basılmaz. Sayfa başka bir sitenin çerçevesi içinde çalışmayı reddeder.
+- **Geçmiş isteğe bağlı.** Ayarlar'da **Geçmişi ve taslağı sakla**'yı kapatırsan yazdığın hiçbir şey saklanmaz.
+- **Her push'ta kontrol.** CI yayından önce 30 test ve güvenlik kontrolü çalıştırır, sızmış anahtar arar. Actions commit SHA'sıyla sabitlenmiştir. CodeQL ve secret scanning repoyu izler.
 
 Ayrıntılar ve sorun bildirme: [SECURITY.md](SECURITY.md).
 
@@ -95,4 +96,4 @@ Hata bildirimleri ve fikirler [Issues](https://github.com/Cafu1107/promtsal/issu
 
 ## Lisans
 
-[MIT](LICENSE)
+[MIT](LICENSE). Fontlar (Bricolage Grotesque, Instrument Sans, IBM Plex Mono) [SIL Open Font License 1.1](web/fonts/) ile birlikte sitede barındırılır.

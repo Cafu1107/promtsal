@@ -19,6 +19,26 @@
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
+  // Clickjacking guard. GitHub Pages can't send X-Frame-Options or a frame-ancestors header, so the web
+  // build refuses to run inside another site's frame. The claude.ai build is framed by design.
+  if (BUILD === "web") {
+    let framed = true;
+    try { framed = window.top !== window.self; } catch (e) { /* cross-origin parent: framed */ }
+    if (framed) {
+      PS.lang = (navigator.language || "tr").toLowerCase().startsWith("tr") ? "tr" : "en";
+      const box = el("div", "wrap");
+      const msg = el("p", "notice", t("frame.blocked") + " ");
+      const link = el("a", null, t("frame.open"));
+      link.href = location.href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      msg.append(link);
+      box.append(msg);
+      document.body.replaceChildren(box);
+      return;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Storage (every access guarded: private windows and blocked storage throw)
   // ---------------------------------------------------------------------------
@@ -26,6 +46,7 @@
   const store = {
     get(k, d) { try { const v = localStorage.getItem(KEY + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    del(k) { try { localStorage.removeItem(KEY + k); } catch (e) { /* storage unavailable */ } },
   };
   // The API key: sessionStorage by default (gone when the tab closes), localStorage only when the
   // visitor ticks "remember". Kept in memory too, so it still works when storage is blocked.
@@ -76,6 +97,7 @@
     modelList: null,
     rules: typeof store.get("rules") === "string" ? store.get("rules") : "",
     rulesOn: store.get("rulesOn") !== false,
+    keep: store.get("keepHistory") !== false,
     view: "prompt",
     current: null,
     ctl: null,
@@ -112,6 +134,10 @@
     .filter((x) => x && typeof x.name === "string" && typeof x.text === "string")
     .map((x) => ({ id: typeof x.id === "string" ? x.id : newId(), name: x.name, text: x.text, target: pick(E.TARGETS, x.target, "general") }));
 
+  // Prompts can be sensitive: history and the draft are written to storage only while "keep" is on.
+  const saveHistoryStore = () => { if (state.keep) store.set("history", history); };
+  const saveDraft = (v) => { if (state.keep) store.set("draft", v); };
+
   function makeExample(lang) {
     const ex = JSON.parse(JSON.stringify(E.EXAMPLES[lang]));
     return Object.assign(ex, { example: true, exampleLang: lang, id: "example", ts: 0, answered: [], provider: "", model: "", usage: null });
@@ -126,7 +152,7 @@
     "stats", "regenBtn", "copyBtn", "usage", "notes", "changesBox", "changes", "qBox", "qCount", "questions", "applyBtn",
     "hist", "histBtn", "histCount", "histClear", "histEmpty", "histList", "footText", "tplBtn", "setBtn",
     "setDlg", "keyInput", "keyShow", "keyRemember", "keySave", "keyClear", "keyStatus", "modelClean", "modelBoost", "modelsHint",
-    "rulesInput", "rulesApply", "wipeBtn", "wipeStatus", "tplDlg", "tplBuiltin", "tplMine", "tplMineEmpty", "tplName", "tplSave", "tplStatus"]) {
+    "rulesInput", "rulesApply", "keepHistory", "wipeBtn", "wipeStatus", "tplDlg", "tplBuiltin", "tplMine", "tplMineEmpty", "tplName", "tplSave", "tplStatus"]) {
     ui[id] = $(id);
   }
 
@@ -267,7 +293,7 @@
       ui.provBtn.classList.remove("need");
       return;
     }
-    const has = !!keyStore.get();
+    const has = P.validKey(keyStore.get());
     ui.provBtn.textContent = has ? t("prov.gemini", { model: modelFor(state.mode) }) : t("prov.needKey");
     ui.provBtn.classList.toggle("need", !has);
   }
@@ -280,7 +306,7 @@
     clearTimeout(estTimer);
     estTimer = setTimeout(updateEstimate, 250);
     clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => store.set("draft", ui.src.value), 300);
+    draftTimer = setTimeout(() => saveDraft(ui.src.value), 300);
   }
   ui.src.addEventListener("input", () => { ui.srcNote.hidden = true; onSrcInput(); });
   ui.src.addEventListener("scroll", () => { ui.lint.scrollTop = ui.src.scrollTop; });
@@ -385,7 +411,7 @@
   let persistTimer = 0;
   const persistSoon = () => {
     clearTimeout(persistTimer);
-    persistTimer = setTimeout(() => store.set("history", history), 300);
+    persistTimer = setTimeout(() => saveHistoryStore(), 300);
   };
   function updateApply() {
     const cur = state.current;
@@ -439,7 +465,7 @@
   // ---------------------------------------------------------------------------
   function saveHistory(entry) {
     history = [entry, ...history.filter((h) => h.id !== entry.id)].slice(0, 40);
-    store.set("history", history);
+    saveHistoryStore();
     renderHistory();
   }
   function renderHistory() {
@@ -462,7 +488,7 @@
       del.setAttribute("aria-label", t("hist.delAria"));
       del.addEventListener("click", () => {
         history = history.filter((x) => x !== h);
-        store.set("history", history);
+        saveHistoryStore();
         renderHistory();
       });
       li.append(open, del);
@@ -473,7 +499,7 @@
     if (state.ctl) return;
     state.current = h;
     ui.src.value = h.input;
-    store.set("draft", h.input);
+    saveDraft(h.input);
     state.mode = h.mode; state.target = h.target; state.lang = h.lang;
     for (const k of ["mode", "target", "lang"]) { store.set(k, state[k]); segSync[k](); }
     state.view = "prompt";
@@ -503,7 +529,7 @@
   }
   armConfirm(ui.histClear, "hist.clear", "hist.confirm", () => {
     history = [];
-    store.set("history", history);
+    saveHistoryStore();
     renderHistory();
   });
 
@@ -527,7 +553,7 @@
     if (!input) { setStatus("st.needInput", "warn"); ui.src.focus(); return; }
     if (input.length > MAX_CHARS) { setStatus("st.tooLong", "warn"); return; }
     const key = BUILD === "web" ? keyStore.get() : "";
-    if (BUILD === "web" && !key) { setStatus("st.needKey", "warn"); openSettings(true); return; }
+    if (BUILD === "web" && !P.validKey(key)) { setStatus("st.needKey", "warn"); openSettings(true); return; }
 
     const settings = { mode: state.mode, target: state.target, lang: state.lang };
     let answered = [], prev = "";
@@ -752,10 +778,16 @@
     fstatus(ui.wipeStatus, "");
     ui.rulesInput.value = state.rules;
     ui.rulesApply.checked = state.rulesOn;
+    ui.keepHistory.checked = state.keep;
     fillModelSelects();
     showDialog(ui.setDlg);
     if (focusKey && BUILD === "web") ui.keyInput.focus();
   }
+  // Don't leave the key sitting in the page once the dialog is closed.
+  ui.setDlg.addEventListener("close", () => {
+    ui.keyInput.value = "";
+    ui.keyInput.type = "password";
+  });
   ui.setBtn.addEventListener("click", () => openSettings(false));
   ui.provBtn.addEventListener("click", () => openSettings(BUILD === "web" && !keyStore.get()));
 
@@ -771,6 +803,7 @@
   ui.keySave.addEventListener("click", async () => {
     const v = ui.keyInput.value.trim();
     if (!v) { fstatus(ui.keyStatus, t("key.empty"), "warn"); return; }
+    if (!P.validKey(v)) { fstatus(ui.keyStatus, t("key.invalidFormat"), "error"); return; }
     ui.keySave.disabled = true;
     fstatus(ui.keyStatus, t("key.testing"));
     try {
@@ -821,12 +854,26 @@
     store.set("rulesOn", state.rulesOn);
     updateEstimate();
   });
+  ui.keepHistory.addEventListener("change", () => {
+    state.keep = ui.keepHistory.checked;
+    store.set("keepHistory", state.keep);
+    if (state.keep) {
+      saveHistoryStore();
+      saveDraft(ui.src.value);
+    } else {
+      // Turning it off erases what is stored; this session's list stays until the tab closes.
+      store.del("history");
+      store.del("draft");
+    }
+  });
   armConfirm(ui.wipeBtn, "data.wipe", "data.confirm", () => {
     wipeStorage();
     history = [];
     myTemplates = [];
     state.rules = "";
     state.rulesOn = true;
+    state.keep = true;
+    ui.keepHistory.checked = true;
     state.modelList = null;
     state.models = { ...E.DEFAULT_MODELS };
     state.current = makeExample(state.ui);
@@ -865,7 +912,7 @@
       state.current = makeExample(state.ui);
       if (showingExample) {
         ui.src.value = state.current.input;
-        store.set("draft", ui.src.value);
+        saveDraft(ui.src.value);
       }
     }
     if (ui.tplDlg.open) renderTemplates();

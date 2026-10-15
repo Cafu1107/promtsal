@@ -161,6 +161,11 @@
       "data.wipe": "Tüm yerel verileri sil",
       "data.confirm": "Emin misin? Tekrar bas",
       "data.wiped": "Tüm yerel veriler silindi.",
+      "data.keep": "Geçmişi ve taslağı bu tarayıcıda sakla",
+      "data.keepHint": "Kapatırsan kayıtlı geçmiş ve taslak hemen silinir. Bu oturumdakiler sekmeyi kapatınca kaybolur.",
+      "key.invalidFormat": "Bu bir API anahtarına benzemiyor. Boşluk ya da satır sonu olmadan yapıştır.",
+      "frame.blocked": "Güvenlik nedeniyle Promtsal başka bir sitenin içinde çalışmaz.",
+      "frame.open": "Promtsal'ı kendi sekmesinde aç",
 
       "tpl.title": "Şablonlar",
       "tpl.builtin": "Hazır şablonlar",
@@ -336,6 +341,11 @@
       "data.wipe": "Delete all local data",
       "data.confirm": "Sure? Click again",
       "data.wiped": "All local data deleted.",
+      "data.keep": "Keep history and the draft in this browser",
+      "data.keepHint": "If you turn this off, the stored history and draft are deleted right away. This session's entries disappear when you close the tab.",
+      "key.invalidFormat": "That doesn't look like an API key. Paste it without spaces or line breaks.",
+      "frame.blocked": "For security, Promtsal doesn't run inside another website.",
+      "frame.open": "Open Promtsal in its own tab",
 
       "tpl.title": "Templates",
       "tpl.builtin": "Built-in templates",
